@@ -2,7 +2,6 @@ import pandas as pd
 from geopy.distance import geodesic
 
 a=1
-# Load the CSV files
 df1 = pd.read_csv('bbmp_lakes_masterlist-final.csv')
 df2 = pd.read_csv('flooding_vulnerable_locations.csv')
 df3 = pd.read_csv('stp_locations.csv')  # Load the new CSV file
@@ -19,17 +18,17 @@ assert 'Latitude' in df2.columns and 'Longitude' in df2.columns
 assert 'Latitude' in df3.columns and 'Longitude' in df3.columns
 
 # Create an empty dataframe to store the results
-result_df = pd.DataFrame(columns=['average_latitude', 'average_longitude', 'Name_of_th', 'LocationName', 'Closest_STP'])
-result_df['Closest_STP'] = result_df['Closest_STP'].astype(object)
+result_df = pd.DataFrame(columns=['average_latitude', 'average_longitude', 'Name_of_th', 'LocationName'])
+print(result_df)
 
 # Compare each pair of coordinates
-for index1, row1 in df1.iterrows():
+for index1, row1 in df1.iterrows():   
     for index2, row2 in df2.iterrows():
         coord1 = (row1['Latitude'], row1['Longitude'])
         coord2 = (row2['Latitude'], row2['Longitude'])
         
-        # If the distance is less than or equal to 15km
-        if geodesic(coord1, coord2).km <= 15:
+        # If the distance is less than or equal to 10km
+        if geodesic(coord1, coord2).km <= 10:
             # Calculate the average coordinates
             avg_latitude = (row1['Latitude'] + row2['Latitude']) / 2
             avg_longitude = (row1['Longitude'] + row2['Longitude']) / 2
@@ -44,29 +43,36 @@ for index1, row1 in df1.iterrows():
             
             # Add the new row to the DataFrame if it's not empty
             if not new_row.empty:
-                result_df.loc[len(result_df)] = new_row.iloc[0]
+                if result_df.empty:
+                    result_df = new_row
+                else:
+                    result_df = pd.concat([result_df, new_row], ignore_index=True)
 
-# If the weather predictor predicts danger
-if (a==1):  # Replace this with the actual condition
-    closest_stp = None
-    closest_distance = None
+# After all rows have been added to result_df, remove duplicates
+result_df = result_df.drop_duplicates(subset=['Name_of_th', 'LocationName'])
 
-    # Compare each pair of coordinates between the result_df and df3
+# Add a new column for the closest STP
+result_df['Closest_STP'] = None
+
+if(a==1):   # Compare each pair of coordinates between the result_df and df3
     for index1, row1 in result_df.iterrows():
-        for index2, row2 in df3.iterrows():
+        closest_stp = None
+        closest_distance = None
+
+        for index3, row3 in df3.iterrows():
             coord1 = (row1['average_latitude'], row1['average_longitude'])
-            coord2 = (row2['Latitude'], row2['Longitude'])
-            
+            coord3 = (row3['Latitude'], row3['Longitude'])
+
             # Calculate the distance
-            distance = geodesic(coord1, coord2).km
-            
+            distance = geodesic(coord1, coord3).km
+
             # If this is the closest STP so far, save it
             if closest_distance is None or distance < closest_distance:
-                closest_stp = row2['STPName']
+                closest_stp = row3['STPName']
                 closest_distance = distance
 
         # Add the closest STP to the result_df
         result_df.loc[index1, 'Closest_STP'] = closest_stp
 
-# Save the result_df to a new CSV file
-result_df.to_csv('result.csv', index=False)
+    # Write result_df to a CSV file
+    result_df.to_csv('output.csv', index=False)
